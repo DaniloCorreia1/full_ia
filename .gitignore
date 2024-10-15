@@ -1,0 +1,9 @@
+static/img/
+
+static/audio/
+
+db.sqlite3
+
+media
+
+venv/
