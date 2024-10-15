@@ -7,3 +7,5 @@ db.sqlite3
 media
 
 venv/
+
+full_ia/
