@@ -1,22 +1,87 @@
-import requests
 import os
-from django.conf import settings
+import requests
 import re
 import logging
+import PyPDF2
+from django.contrib.sessions.models import Session
 from pathlib import Path
 from django.shortcuts import render
 from django.http import JsonResponse
-import whisper
+from django.conf import settings
 from openai import OpenAI
+from langchain_openai import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+
 
 # Inicializando o cliente OpenAI
 client = OpenAI(api_key='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')  # Insira sua chave da API aqui
 logger = logging.getLogger(__name__)
 
+os.environ['OPENAI_API_KEY'] = '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'
+model = ChatOpenAI(model='gpt-3.5-turbo')
 # Inicializa uma lista para armazenar o histórico de mensagens
 chat_history = []
 
+def file_upload(file_path):
+    try:
+        with open(file_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
+                else:
+                    logger.warning("Nenhum texto extraído da página.")
+            return text if text else "Nenhum texto extraído."
+    except Exception as e:
+        logger.error(f'Erro ao processar o PDF: {e}')
+        return "Erro ao processar o arquivo PDF."
 
+
+# Função para gerar respostas com base no conhecimento do arquivo
+def generate_response_with_document(contexto, pergunta):
+    prompt_base_conhecimento = PromptTemplate(
+        input_variables=['contexto', 'pergunta'],
+        template='''Use o seguinte contexto para responder à pergunta.
+                    Responda apenas com base nas informações fornecidas.
+                    Não utilize informações externas ao contexto:
+                    Contexto: {contexto}
+                    Pergunta: {pergunta}'''
+    )
+    chain = prompt_base_conhecimento | model | StrOutputParser()
+    response = chain.invoke({'contexto': contexto, 'pergunta': pergunta})
+    return response
+
+# View para upload de arquivos e resposta baseada no arquivo
+def upload_and_ask_view(request):
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('file')
+        pergunta = request.POST.get('pergunta')
+
+        if not uploaded_file or not pergunta:
+            return JsonResponse({"error": "Arquivo ou pergunta não fornecidos."}, status=400)
+
+        try:
+            # Salvar o arquivo enviado
+            file_path = os.path.join('media', sanitize_filename(uploaded_file.name))
+            with open(file_path, 'wb+') as destination:
+                for chunk in uploaded_file.chunks():
+                    destination.write(chunk)
+
+            # Carregar e processar o arquivo
+            contexto = file_upload(file_path)
+            bot_response = generate_response_with_document(contexto, pergunta)
+
+            return JsonResponse({'response': bot_response})
+        
+        except Exception as e:
+            logger.error(f"Erro ao processar o arquivo: {e}")
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid HTTP method'}, status=405)
 
 def sanitize_filename(text):
     return re.sub(r'\W+', '_', text.strip())
@@ -42,26 +107,7 @@ def audio_to_text(file_path):
             logger.error(f"Erro ao transcrever o áudio: {e}")
             return "Erro ao transcrever o áudio."
 
-def generate_code_response(prompt):
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Você é um assistente que ajuda a gerar código fonte."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    
-    # Adiciona as marcações de código
-    code = response.choices[0].message.content.strip()
-    return f"```\n{code}\n```"  # Retorna o código gerado com formatação
 
-# Função para conversão de texto para áudio
-import os
-from pathlib import Path
-import logging
-
-# Configura o logger
-logger = logging.getLogger(__name__)
 
 def text_to_audio(text, output_filename="speech.mp3"):
     # Converte o nome do arquivo para um objeto Path
@@ -162,7 +208,11 @@ def chat_view(request):
     elif request.method == 'POST':
         user_message = request.POST.get('message')
         mode = request.POST.get('mode')
-        logger.debug(f'Mensagem do usuário: {user_message}')
+        logger.debug(f'Mensagem do usuário: {user_message}, Modo: {mode}')
+
+        bot_response = None
+        image_url = None
+        audio_url = None
 
         # Se o modo for 'audio_to_text', verifica se o arquivo de áudio foi fornecido
         if mode == 'audio_to_text':
@@ -172,16 +222,39 @@ def chat_view(request):
                 return JsonResponse({"error": "No audio file provided"}, status=400)
 
         # Verifica se a mensagem do usuário foi fornecida, caso o modo não seja 'audio_to_text'
-        if not user_message and mode != 'audio_to_text':
+        if not user_message and mode != 'audio_to_text' and mode != 'file_upload':
+            logger.error("Mensagem do usuário não fornecida.")
             return JsonResponse({"error": "No message provided"}, status=400)
-
-        bot_response = None
-        image_url = None
-        audio_url = None
 
         try:
             if mode == 'text':
-                bot_response = generate_text_response(user_message)
+                contexto = request.session.get('contexto')
+                if contexto:
+                    bot_response = generate_response_with_document(contexto, user_message)
+                else:
+                    bot_response = "Por favor, faça o upload de um arquivo primeiro para que eu possa responder suas perguntas."
+
+            elif mode == 'file_upload':
+                uploaded_file = request.FILES.get('file')
+                if not uploaded_file:
+                    logger.error("Arquivo não fornecido.")
+                    return JsonResponse({"error": "No file provided"}, status=400)
+
+                # Salvar o arquivo
+                file_path = os.path.join('media', sanitize_filename(uploaded_file.name))
+                os.makedirs('media', exist_ok=True)
+                with open(file_path, 'wb+') as destination:
+                    for chunk in uploaded_file.chunks():
+                        destination.write(chunk)
+
+                # Carregar e processar o arquivo
+                contexto = file_upload(file_path)  # Extrair texto do PDF
+                logger.debug(f'Contexto extraído: {contexto}')
+                
+                # Armazenar contexto na sessão
+                request.session['contexto'] = contexto
+
+                bot_response = "Arquivo carregado com sucesso! Agora você pode fazer perguntas sobre o conteúdo."
 
             elif mode == 'generate_image':
                 image_url = generate_image(user_message)
@@ -200,9 +273,6 @@ def chat_view(request):
                         destination.write(chunk)
                 bot_response = audio_to_text(file_path)
 
-            elif mode == 'generate_code':
-                bot_response = generate_code_response(user_message)
-
             logger.debug(f'Resposta do bot: {bot_response}, Imagem: {image_url}, Áudio: {audio_url}')
         except Exception as e:
             logger.error(f'Erro ao gerar resposta: {e}')
@@ -217,4 +287,6 @@ def chat_view(request):
         return JsonResponse(response_data)
 
     return JsonResponse({'error': 'Invalid HTTP method'}, status=405)
+
+
 
