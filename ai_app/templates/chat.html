@@ -184,7 +184,7 @@
                 <option value="audio_to_text">Áudio para Texto</option>
                 <option value="text_to_audio">Texto para Áudio</option>
                 <option value="generate_image">Gerar Imagem</option>
-                <option value="file_upload">Enviar Arquivo</option> <!-- Novo modo -->
+                <option value="file_upload">Enviar Documento</option> <!-- Novo modo -->
             </select>
             <i class="fas fa-folder" id="upload-button" style="display: none; cursor: pointer; color: aqua; font-size: 24px; margin: 10px;"> Clique</i>
             <input type="file" id="file-input" class="d-none"> <!-- Novo input para arquivos -->
@@ -205,64 +205,68 @@
         const audioInput = document.getElementById('audio-input');
         const fileInput = document.getElementById('file-input');
         const uploadButton = document.getElementById('upload-button');
-
+    
         // Esconder os inputs de arquivos de áudio e de arquivos gerais desde o início
         audioInput.style.display = 'none';
         fileInput.style.display = 'none';
-
+    
         modeSelect.addEventListener('change', function() {
             const isAudioToText = modeSelect.value === 'audio_to_text';
             const isFileUploadMode = modeSelect.value === 'file_upload'; // Correto!
-
+    
             // Mostrar o botão de upload tanto para áudio quanto para arquivos
             uploadButton.style.display = (isAudioToText || isFileUploadMode) ? 'inline-block' : 'none';
-
+    
             // Alterna os inputs de arquivo e áudio de acordo com o modo selecionado (mas escondidos)
             audioInput.classList.toggle('d-none', !isAudioToText);
             fileInput.classList.toggle('d-none', !isFileUploadMode);
-
+    
             // Esconder o input de mensagem de texto em ambos os modos de upload
             messageInput.classList.toggle('d-none', isAudioToText || isFileUploadMode);
-
+    
             // Desabilitar o botão de envio quando no modo de upload
             sendButton.disabled = isAudioToText || isFileUploadMode;
         });
-
+    
         // Quando o botão de upload é clicado, acionar o input correto
         uploadButton.addEventListener('click', () => {
             const isAudioToText = modeSelect.value === 'audio_to_text';
             const isFileUploadMode = modeSelect.value === 'file_upload';
-
+    
             if (isAudioToText) {
                 audioInput.click(); // Aciona o seletor de arquivos para áudio
             } else if (isFileUploadMode) {
                 fileInput.click(); // Aciona o seletor de arquivos gerais
             }
         });
-
+    
         // Função de envio de arquivo (áudio ou geral)
         fileInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
-                appendMessage('user', `Arquivo enviado: ${file.name}`);
+                const fileURL = URL.createObjectURL(file); // Cria um URL temporário para o arquivo
+                appendMessage('user', fileURL, 'file');  // Salva como tipo "file"
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('mode', 'file_upload');
                 sendMessage(formData);
+                saveChatHistory('user', fileURL, 'file');  // Salvar no localStorage
             }
         });
-
+    
         audioInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
-                appendMessage('user', `Áudio enviado: ${file.name}`);
+                const fileURL = URL.createObjectURL(file); // Cria um URL temporário para o arquivo
+                appendMessage('user', fileURL, 'audio');  // Salva como tipo "audio"
                 const formData = new FormData();
                 formData.append('audio_file', file);
                 formData.append('mode', 'audio_to_text');
                 sendMessage(formData);
+                saveChatHistory('user', fileURL, 'audio');  // Salvar no localStorage
             }
         });
-
+    
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -277,21 +281,28 @@
             }
             return cookieValue;
         }
-
+    
         function loadChatHistory() {
             const chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
             chatHistory.forEach(chat => {
-                appendMessage(chat.sender, chat.message);
+                appendMessage(chat.sender, chat.message, chat.fileType); // Agora também carrega arquivos
             });
         }
-
-        function appendMessage(sender, message) {
+    
+        function appendMessage(sender, message, fileType = null) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message', sender === 'bot' ? 'bot-message' : 'user-message');
-
+    
             const icon = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
-            messageDiv.innerHTML = `${icon} ${message}`;
-
+            
+            if (fileType === 'audio') {
+                messageDiv.innerHTML = `${icon} Áudio enviado: <audio controls><source src="${message}" type="audio/mpeg"></audio>`;
+            } else if (fileType === 'file') {
+                messageDiv.innerHTML = `${icon} Arquivo enviado: <a href="${message}" target="_blank">${message}</a>`;
+            } else {
+                messageDiv.innerHTML = `${icon} ${message}`;
+            }
+    
             const wrapperDiv = document.createElement('div');
             wrapperDiv.classList.add('d-flex');
             wrapperDiv.appendChild(messageDiv);
@@ -299,23 +310,23 @@
             chatBox.appendChild(wrapperDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
-
+    
         function simulateTyping(message) {
             const typingIndicator = document.createElement('div');
             typingIndicator.classList.add('message', 'bot-message');
             typingIndicator.innerHTML = '<i class="fas fa-robot"></i> Digitando...';
             chatBox.appendChild(typingIndicator);
             chatBox.scrollTop = chatBox.scrollHeight;
-
+    
             const typingDuration = Math.min(3000, message.length * 100);
-
+    
             setTimeout(() => {
                 chatBox.removeChild(typingIndicator);
                 appendMessage('bot', message);
                 saveChatHistory('bot', message);
             }, typingDuration);
         }
-
+    
         function sendMessage(formData) {
             fetch('', {
                 method: 'POST',
@@ -347,13 +358,20 @@
                 console.error('Erro:', error);
             });
         }
-
-        function saveChatHistory(sender, message) {
+    
+        function saveChatHistory(sender, message, fileType = null) {
             const chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
-            chatHistory.push({ sender, message });
+            chatHistory.push({ sender, message, fileType });  // Adicionar fileType
             localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
         }
-
+    
+        messageInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Previne a quebra de linha
+                sendButton.click(); // Aciona o botão de envio
+            }
+        });
+    
         sendButton.addEventListener('click', (e) => {
             e.preventDefault();
             const message = messageInput.value.trim();
@@ -361,7 +379,7 @@
                 appendMessage('user', message);
                 saveChatHistory('user', message);
                 messageInput.value = '';
-
+    
                 const mode = modeSelect.value;
                 const formData = new FormData();
                 formData.append('message', message);
@@ -370,9 +388,9 @@
                 sendMessage(formData);
             }
         });
-
+    
         loadChatHistory();
-
+    
         document.getElementById('clear-chat-button').addEventListener('click', () => {
             localStorage.removeItem('chatHistory');
             chatBox.innerHTML = '';

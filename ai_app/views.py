@@ -46,7 +46,7 @@ def generate_response_with_document(contexto, pergunta):
     prompt_base_conhecimento = PromptTemplate(
         input_variables=['contexto', 'pergunta'],
         template='''Use o seguinte contexto para responder à pergunta.
-                    Responda apenas com base nas informações fornecidas.
+                    Responda apenas com base nas informações fornecidas caso o usuário queria saber do arquivo.
                     Não utilize informações externas ao contexto:
                     Contexto: {contexto}
                     Pergunta: {pergunta}'''
@@ -62,7 +62,7 @@ def upload_and_ask_view(request):
         pergunta = request.POST.get('pergunta')
 
         if not uploaded_file or not pergunta:
-            return JsonResponse({"error": "Arquivo ou pergunta não fornecidos."}, status=400)
+            return JsonResponse({"error": "Documento ou pergunta não fornecidos."}, status=400)
 
         try:
             # Salvar o arquivo enviado
@@ -182,6 +182,15 @@ def generate_image(prompt):
     else:
         raise Exception("Falha ao baixar a imagem.")
 
+chat_history = [
+    {
+        "role": "system",
+        "content": (
+            "Você é um assistente virtual que se chama Nymira. "
+            "Seja educado, amigável e ajude o Usuário com o que ela precisar."
+        )
+    }
+]
 # Função para gerar resposta de texto (Usando ChatGPT)
 def generate_text_response(prompt):
     # Adiciona a mensagem do usuário ao histórico
@@ -229,15 +238,18 @@ def chat_view(request):
         try:
             if mode == 'text':
                 contexto = request.session.get('contexto')
-                if contexto:
+                
+                # Verifica se a pergunta é sobre o documento
+                if "documento" in user_message.lower() and contexto:
                     bot_response = generate_response_with_document(contexto, user_message)
                 else:
-                    bot_response = "Por favor, faça o upload de um arquivo primeiro para que eu possa responder suas perguntas."
+                    # Gera uma resposta geral se não for sobre o documento
+                    bot_response = generate_text_response(user_message)
 
             elif mode == 'file_upload':
                 uploaded_file = request.FILES.get('file')
                 if not uploaded_file:
-                    logger.error("Arquivo não fornecido.")
+                    logger.error("Documento não fornecido.")
                     return JsonResponse({"error": "No file provided"}, status=400)
 
                 # Salvar o arquivo
@@ -254,7 +266,7 @@ def chat_view(request):
                 # Armazenar contexto na sessão
                 request.session['contexto'] = contexto
 
-                bot_response = "Arquivo carregado com sucesso! Agora você pode fazer perguntas sobre o conteúdo."
+                bot_response = "Documento carregado com sucesso! Agora você pode fazer perguntas sobre o conteúdo."
 
             elif mode == 'generate_image':
                 image_url = generate_image(user_message)
