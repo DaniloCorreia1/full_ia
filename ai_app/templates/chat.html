@@ -5,31 +5,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assistente</title>
+    <link rel="icon" href="{% static 'logo.png' %}" type="image/png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/static/service-worker.js')
+            .then(function(registration) {
+              console.log('Service Worker registrado com sucesso:', registration);
+            })
+            .catch(function(error) {
+              console.log('Falha no registro do Service Worker:', error);
+            });
+        }
+      </script>
+      
     <style>
         body {
-        background-image: url('{% static "bg2.png" %}');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        color: #fff;
-        font-family: 'Arial', sans-serif;
-        display: flex; /* Use flexbox */
-        flex-direction: column; /* Direção da coluna para empilhar os elementos */
-        height: 100vh; /* Altura total da janela */
-        margin: 0; /* Remove margens para evitar rolagem */
-    }
-
+            background-image: url('{% static "bg2.png" %}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+        }
+    
         .chat-container {
             margin: 50px auto;
             max-width: 600px;
             border-radius: 15px;
             overflow: hidden;
             box-shadow: 0 0 20px rgba(112, 184, 176, 0.5);
-            min-height: 500px; /* Altura mínima para o container do chat */
+            min-height: 500px;
             background-color: #292929be;
         }
+    
         .chat-box {
             height: 600px;
             overflow-y: auto;
@@ -40,6 +56,7 @@
             color: #239e9e;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
         }
+    
         .message {
             margin: 10px 0;
             padding: 15px;
@@ -49,6 +66,7 @@
             position: relative;
             transition: transform 0.2s, box-shadow 0.2s;
         }
+    
         .bot-message {
             background-color: #242424;
             color: aqua;
@@ -56,6 +74,7 @@
             display: flex;
             align-items: center;
         }
+    
         .user-message {
             background-color: #239a9e;
             color: #ffffff;
@@ -64,113 +83,172 @@
             display: flex;
             align-items: center;
         }
+    
         .message i {
-            margin-right: 8px; /* Espaço entre o ícone e a mensagem */
+            margin-right: 8px;
         }
+    
         .input-group {
             padding: 15px;
             background: #2c2b2b00;
             border-top: 5px solid #239a9e;
             position: relative;
         }
+    
         .input-group select,
         .input-group input[type="text"] {
             z-index: 1;
         }
+    
         #send-button {
             z-index: 2;
         }
+    
         #audio-input {
             display: none;
         }
+    
         .message:hover {
             transform: scale(1.02);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
+    
         #clear-chat-button {
             margin-top: 10px;
         }
+    
         h2 {
             color: #ffffff;
         }
-        .form-control{
-            background-color: #2424240e; /* Fundo da caixa */
-            color: aqua; /* Cor do texto */
-            border: 1px solid aqua; /* Cor da borda */
-            appearance: none; /* Remove o estilo padrão do select */
-            -webkit-appearance: none; /* Para navegadores Webkit */
-            -moz-appearance: none; /* Para navegadores Firefox */
-            padding-right: 2rem; /* Espaço extra para o ícone da setinha */
+    
+        .form-control {
+            background-color: #2424240e;
+            color: aqua;
+            border: 1px solid aqua;
+            appearance: none;
+            padding-right: 2rem;
             position: relative;
         }
+    
         .form-control:focus {
-            background-color: #2424240e; /* Fundo ao clicar no select */
-            color: aqua; /* Cor do texto ao clicar */
-            border-color: aqua; /* Cor da borda ao clicar */
-            outline: none; /* Remove o outline padrão */
+            background-color: #2424240e;
+            color: aqua;
+            border-color: aqua;
+            outline: none;
         }
+    
         .form-select {
-            background-color: #2424240e; /* Fundo da caixa */
-            color: aqua; /* Cor do texto */
-            border: 1px solid aqua; /* Cor da borda */
-            appearance: none; /* Remove o estilo padrão do select */
-            -webkit-appearance: none; /* Para navegadores Webkit */
-            -moz-appearance: none; /* Para navegadores Firefox */
-            padding-right: 2rem; /* Espaço extra para o ícone da setinha */
+            background-color: #2424240e;
+            color: aqua;
+            border: 1px solid aqua;
+            appearance: none;
+            padding-right: 2rem;
             position: relative;
-            
-            
         }
-
+    
         .form-select:focus {
-            background-color: #2424240e; /* Fundo ao clicar no select */
-            color: aqua; /* Cor do texto ao clicar */
-            border-color: aqua; /* Cor da borda ao clicar */
-            outline: none; /* Remove o outline padrão */
+            background-color: #2424240e;
+            color: aqua;
+            border-color: aqua;
+            outline: none;
         }
-
+    
         .form-select option {
-            background-color: #242424; /* Cor do fundo das opções */
-            color: aqua; /* Cor do texto das opções */
+            background-color: #242424;
+            color: aqua;
         }
-
-        /* Remove o estilo da setinha no IE/Edge */
+    
         .form-select::-ms-expand {
             display: none;
         }
-
-        /* Para adicionar uma setinha customizada */
-        .form-select:after {
-            content: '▼'; /* Caracter da setinha */
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            color: aqua; /* Cor da setinha */
-        }
-
-
+    
         .code-container {
             background-color: #e9ecef;
             border-radius: 10px;
             padding: 20px;
-            overflow: auto; /* Permite rolagem se necessário */
-            max-height: 400px; /* Limita a altura do container */
+            overflow: auto;
+            max-height: 400px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+    
         pre {
-            margin: 0; /* Remove margem para melhor alinhamento */
-            white-space: pre-wrap; /* Quebra de linha automática */
-            word-wrap: break-word; /* Quebra palavras longas */
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
-
-        @media (max-height: 700px) {
+    
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .chat-container {
+                width: 90%;
+                height: auto;
+            }
+    
             .chat-box {
                 height: 400px;
+                padding: 15px;
+            }
+    
+            .input-group {
+                padding: 10px;
+            }
+    
+            .message {
+                padding: 10px;
+                font-size: 14px;
             }
         }
-    </style>
+    
+        @media (max-width: 480px) {
+        .chat-container {
+            width: 100%;
+            height: auto;
+        }
+
+        .chat-box {
+            height: 300px;
+        }
+
+        .message {
+            padding: 8px;
+            font-size: 12px;
+        }
+
+        .input-group {
+            padding: 8px;
+        }
+
+        #send-button {
+            padding: 8px 10px;
+        }
+    }
+
+    /* Ajustes adicionais para a dimensão 375x667 */
+    @media (max-width: 375px) and (min-height: 667px) {
+        .chat-container {
+            width: 95%;
+            height: 95%; /* Ajuste da altura para aproveitar melhor o espaço */
+        }
+
+        .chat-box {
+            height: 360px;
+        }
+
+        .message {
+            padding: 10px;
+            font-size: 13px;
+        }
+
+        .input-group {
+            padding: 10px;
+        }
+
+        #send-button {
+            padding: 10px;
+        }
+    }
+</style>
+    
 </head>
 <body>
     <div class="container chat-container">

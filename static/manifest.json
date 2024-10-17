@@ -1,0 +1,22 @@
+{
+    "name": "Assistente",
+    "short_name": "App",
+    "description": "Assistente virtual.",
+    "start_url": "https://danilocorreia.pythonanywhere.com/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#239a9e",
+    "icons": [
+      {
+        "src": "/static/logo-192x192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "/static/logo-512x512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }
+  

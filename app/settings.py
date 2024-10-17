@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-^&ibh&(6t0@3le%$10i!=h5@km^(4d7p-9e(jxaany=a7pv&5_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['danilocorreia.pythonanywhere.com']
 
 
 # Application definition
@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'ai_app',
-    
+
 ]
 
 MIDDLEWARE = [
@@ -123,14 +123,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATIC_URL = 'static/'
+STATIC_ROOT = "/home/danilocorreia/full_ia/static"
+STATIC_URL = '/static/'
 
 # Certifique-se de que você tem isso se estiver em desenvolvimento
-if DEBUG:
-    STATICFILES_DIRS = [
-        os.path.join(BASE_DIR, "static"),
-    ]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
